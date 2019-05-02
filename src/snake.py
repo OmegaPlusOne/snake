@@ -1,134 +1,141 @@
 import pygame
-from pygame.locals import *
-from random import randint
-
-ARRAY_SIZE = 70
-
-DIRECTIONS = {
-    "LEFT": (-1, 0),
-    "RIGHT": (1, 0),
-    "UP": (0, 1),
-    "DOWN": (0, -1),
-}
-
-snake, fruit = None, None
+import random
 
 
-def init():
-    global snake
-    snake = [(0, 2), (0, 1), (0, 0)]
-    place_fruit((ARRAY_SIZE // 2, ARRAY_SIZE//2))
+pygame.init()
+
+white = (255, 255, 255)
+black = (0, 0, 0)
+red = (255, 0, 0)
+green = (0, 255, 0)
+blue = (0, 0, 255)
+apple_red = (145, 28, 20)
+deep_red = (127, 19, 19)
+head_color = (37, 84, 49)
+background = (178, 178, 178)
+
+width = 800
+height = 600
 
 
-def place_fruit(coord = None):
-    global fruit
-    if coord:
-        fruit = coord
-        return
+game_display = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Slither")
 
-    while True:
-        x = randint(0, ARRAY_SIZE-1)
-        y = randint(0, ARRAY_SIZE-1)
-        if (x, y) not in snake:
-            fruit = x, y
-            return
+fps_clock = pygame.time.Clock()
+fps = 60
+vel = 5
+block_size = 20
+apple_size = 20
+
+font = pygame.font.SysFont('8bitoperatorregular', 25)
 
 
-def step(direction):
-    old_head = snake[0]
-    movement = DIRECTIONS[direction]
-    new_head = (old_head[0] + movement[0], old_head[1] + movement[1])
-
-    if (
-        new_head[0] < 0 or
-        new_head[0] >= ARRAY_SIZE or
-        new_head[1] < 0 or
-        new_head[1] >= ARRAY_SIZE or
-        new_head in snake
-    ):
-        return False
-
-    if new_head == fruit:
-        place_fruit()
-    else:
-        tail = snake[-1]
-        del snake[-1]
-
-    snake.insert(0, new_head)
-    return True
+def call_snake(snake_list, block_size):
+    for XY in snake_list:
+        game_display.fill(head_color, rect=[XY[0], XY[1], block_size, block_size])
 
 
-def print_field():
-    os.system('clear')
-    print('=' * (ARRAY_SIZE + 2))
-    for y in range(ARRAY_SIZE-1, -1, -1):
-        print('|', end='')
-        for x in range(ARRAY_SIZE):
-            out = ' '
-            if (x, y) in snake:
-                out = 'x'
-            elif (x, y) == fruit:
-                out = 'O'
-            print(out, end='')
-        print('|')
-    print('=' * (ARRAY_SIZE + 2))
+def text_objects(text, color):
+    text_surface = font.render(text, True, color)
+    return text_surface, text_surface.get_rect()
 
 
-def test():
-    global fruit
-    init()
-    assert step('UP')
+def message_screen(msg, color):
+    text_surface, text_rect = text_objects(msg, color)
+    text_rect.center = (width/2), (height/2)
+    game_display.blit(text_surface, text_rect)
 
-    assert snake == [(0, 3), (0, 2), (0, 1)]
+def game_loop():
+    game_exit = False
+    game_over = False
 
-    fruit = (0, 4)
-    assert step('UP')
+    lead_x = width / 2
+    lead_y = height / 2
+    lead_x_change = 0
+    lead_y_change = 0
 
-    assert snake == [(0, 4), (0, 3), (0, 2), (0, 1)]
-    assert fruit != (0, 4)
+    snake_list = []
+    snake_length = 1
 
-    assert not step('DOWN'), 'kdyz nacouvam do sebe, umru'
+    apple_x = round(random.randrange(0, width - apple_size))
+    apple_y = round(random.randrange(0, height - apple_size))
+
+    while not game_exit:
+
+        while game_over:
+            game_display.fill(background)
+            message_screen("Game over, press C to play again or Q to leave", deep_red)
+            pygame.display.update()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    game_exit = True
+                    game_over = False
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        game_exit = True
+                        game_over = False
+                    if event.key == pygame.K_q:
+                        game_exit = True
+                        game_over = False
+                    if event.key == pygame.K_c:
+                        game_loop()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game_exit = True
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    game_exit = True
+                if event.key == pygame.K_LEFT:
+                    lead_x_change = -vel
+                    lead_y_change = 0
+                elif event.key == pygame.K_RIGHT:
+                    lead_x_change = vel
+                    lead_y_change = 0
+
+                elif event.key == pygame.K_UP:
+                    lead_y_change = -vel
+                    lead_x_change = 0
+                elif event.key == pygame.K_DOWN:
+                    lead_y_change = vel
+                    lead_x_change = 0
+
+        if lead_x >= width or lead_x < 0 or lead_y >= height or lead_y < 0:
+            game_over = True
+
+        lead_x += lead_x_change
+        lead_y += lead_y_change
+
+        game_display.fill(background)
+        game_display.fill(apple_red, rect=[apple_x, apple_y,apple_size,apple_size])
+
+        snake_head = []
+        snake_head.append(lead_x)
+        snake_head.append(lead_y)
+        snake_list.append(snake_head)
+
+        if len(snake_list) > snake_length:
+            del snake_list[0]
+
+        for seg in snake_list[:-1]:
+            if seg == snake_head:
+                game_over = True
+
+        call_snake(snake_list, block_size)
+
+        pygame.display.update()
+
+        if lead_x > apple_x and lead_x < apple_x + apple_size or lead_x + block_size > apple_x and lead_x + block_size < apple_x + apple_size:
+            if lead_y > apple_y and lead_y < apple_y + apple_size or lead_y + block_size > apple_y and lead_y + block_size < apple_y + apple_size:
+                apple_x = round(random.randrange(0, width - block_size) / 10.0) * 10
+                apple_y = round(random.randrange(0, height - block_size) / 10.0) * 10
+                snake_length += 10
+
+        fps_clock.tick(fps)
+
+    pygame.quit()
+    quit()
 
 
-DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT']
-
-
-def run():
-    init()
-
-    direction = 0
-
-    pygame.init()
-    s = pygame.display.set_mode((ARRAY_SIZE * 10, ARRAY_SIZE * 10))
-    #pygame.display,set_caption('Snake')
-    appleimage = pygame.Surface((10, 10))
-    appleimage.fill((0, 255, 0))
-    img = pygame.Surface((10, 10))
-    img.fill((255, 0, 0))
-    clock = pygame.time.Clock()
-
-    pygame.time.set_timer(1, 100)
-
-    while True:
-        e = pygame.event.wait()
-        if e.type == QUIT:
-            pygame.quit()
-        elif e.type == MOUSEBUTTONDOWN:
-            if e.button == 3:
-                direction = (direction + 1) % 4
-            elif e.button == 1:
-                direction = (direction + 3) % 4
-
-        if not step(DIRS[direction]):
-            pygame.quit()
-            sys.exit(1)
-
-        s.fill((255, 255, 255))
-        for bit in snake:
-            s.blit(img, (bit[0] * 10, (ARRAY_SIZE - bit[1] - 1) * 10))
-        s.blit(appleimage, (fruit[0] * 10, (ARRAY_SIZE - fruit[1] - 1)*10))
-        pygame.display.flip()
-
-
-
-run()
+game_loop()
